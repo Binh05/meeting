@@ -4,6 +4,7 @@ import type { NextRequest } from "next/server";
 const API_PATH = "http://localhost:5000/v1";
 
 export async function middleware(req: NextRequest) {
+  return NextResponse.next();
   const refTokenId = req.cookies.get("refresh_token_id")?.value;
   const url = new URL("/", req.url);
 
