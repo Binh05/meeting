@@ -1,83 +1,83 @@
-"use client";
+// "use client";
 
-import axios from "axios";
+// import axios from "axios";
 
-const API_URL = "http://localhost:5000/v1";
+// const API_URL = "http://localhost:5000/v1";
 
-export const api = axios.create({
-  baseURL: API_URL,
-  withCredentials: true,
-});
+// export const api = axios.create({
+//   baseURL: API_URL,
+//   withCredentials: true,
+// });
 
-let isRefreshing = false;
-let failedQueue: any[] = [];
+// let isRefreshing = false;
+// let failedQueue: any[] = [];
 
-const processQueue = (error: any, token: string | null = null) => {
-  failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve(token);
-    }
-  });
-  failedQueue = [];
-};
+// const processQueue = (error: any, token: string | null = null) => {
+//   failedQueue.forEach((prom) => {
+//     if (error) {
+//       prom.reject(error);
+//     } else {
+//       prom.resolve(token);
+//     }
+//   });
+//   failedQueue = [];
+// };
 
-api.interceptors.request.use(
-  (config) => {
-    const token = (window as any).__ACCESS_TOKEN__;
-    if (token && config.headers) {
-      config.headers["Authorization"] = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+// api.interceptors.request.use(
+//   (config) => {
+//     const token = (window as any).__ACCESS_TOKEN__;
+//     if (token && config.headers) {
+//       config.headers["Authorization"] = `Bearer ${token}`;
+//     }
+//     return config;
+//   },
+//   (error) => Promise.reject(error)
+// );
 
-api.interceptors.response.use(
-  (res) => res,
-  async (error) => {
-    const originalRequest = error.config;
+// api.interceptors.response.use(
+//   (res) => res,
+//   async (error) => {
+//     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
+//     if (error.response?.status === 401 && !originalRequest._retry) {
+//       originalRequest._retry = true;
 
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            originalRequest.headers["Authorization"] = `Bearer ${token}`;
-            return api(originalRequest);
-          })
-          .catch((err) => Promise.reject(err));
-      }
+//       if (isRefreshing) {
+//         return new Promise((resolve, reject) => {
+//           failedQueue.push({ resolve, reject });
+//         })
+//           .then((token) => {
+//             originalRequest.headers["Authorization"] = `Bearer ${token}`;
+//             return api(originalRequest);
+//           })
+//           .catch((err) => Promise.reject(err));
+//       }
 
-      isRefreshing = true;
+//       isRefreshing = true;
 
-      try {
-        const res = await axios.post(
-          `${API_URL}/auth/refreshtoken`,
-          {},
-          { withCredentials: true }
-        );
+//       try {
+//         const res = await axios.post(
+//           `${API_URL}/auth/refreshtoken`,
+//           {},
+//           { withCredentials: true }
+//         );
 
-        const newToken = res.data.accessToken;
-        (window as any).__ACCESS_TOKEN__ = newToken;
+//         const newToken = res.data.accessToken;
+//         (window as any).__ACCESS_TOKEN__ = newToken;
 
-        processQueue(null, newToken);
+//         processQueue(null, newToken);
 
-        originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
-        return api(originalRequest);
-      } catch (err) {
-        processQueue(err, null);
-        return Promise.reject(err);
-      } finally {
-        isRefreshing = false;
-      }
-    }
-    return Promise.reject(error);
-  }
-);
+//         originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
+//         return api(originalRequest);
+//       } catch (err) {
+//         processQueue(err, null);
+//         return Promise.reject(err);
+//       } finally {
+//         isRefreshing = false;
+//       }
+//     }
+//     return Promise.reject(error);
+//   }
+// );
 
-export default api;
+// export default api;

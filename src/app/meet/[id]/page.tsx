@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/authContext";
+//import { useAuth } from "@/hooks/authContext";
 import { useParams, useRouter } from "next/navigation";
 import { useSocket } from "@/hooks/useSocket";
 import { useEffect, useRef, useState } from "react";
@@ -69,12 +69,10 @@ export default function Page() {
             peer.current = createPeer();
             peer.current.on("open", (id) => {
                 peerId.current = id;
-                console.log("peer id current: ", peerId.current);
                 socket?.emit("join-room", roomId, id);
             });
 
             socket!.on("user-connected", (userId) => {
-                console.log("user ID: ", userId);
                 peer.current!.call(userId, streamRef.current!);
                 socket?.emit("responsePeerId", roomId, peerId.current);
             });
