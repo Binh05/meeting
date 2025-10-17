@@ -8,7 +8,7 @@ import { useSocket } from "@/hooks/useSocket";
 import { useEffect, useRef, useState } from "react";
 import { Video, Mic, Phone } from "lucide-react";
 import { createPeer } from "../peerClient";
-import Stream from "stream";
+import Peer from "peerjs";
 
 const constraints = {
     video: {
@@ -16,6 +16,7 @@ const constraints = {
         height: { ideal: 1080 },
         facingMode: "user",
     },
+    audio: true,
 };
 
 export default function Page() {
@@ -26,8 +27,9 @@ export default function Page() {
     const [isCameraOn, setIsCameraOn] = useState<boolean>(false);
 
     const socket = useSocket();
-    const peerId = useRef<any>(null);
-    const roomId = useParams();
+    const peer = useRef<Peer | null>(null);
+    const peerId = useRef<string | null>(null);
+    const roomId = useParams().id;
 
     const openCamera = async () => {
         try {
@@ -42,50 +44,66 @@ export default function Page() {
             setIsCameraOn(true);
         } catch (error) {
             console.error(error);
+        } finally {
+            console.log("local video", localVideo.current?.srcObject);
         }
     };
 
+    const initialized = useRef(false);
+
     useEffect(() => {
-        let peerInstance: any;
-
         (async () => {
+            if (initialized.current) return;
+            initialized.current = true;
+
+            if (localVideo.current?.srcObject) return;
             await openCamera();
+        })();
+    }, []);
 
-            peerInstance = createPeer();
+    useEffect(() => {
+        try {
+            socket?.emit("user-connect", true);
+            socket?.on("serverResponse", (msg) => console.log(msg));
 
-            peerInstance.on("open", (id: string) => {
+            peer.current = createPeer();
+            peer.current.on("open", (id) => {
                 peerId.current = id;
+                console.log("peer id current: ", peerId.current);
                 socket?.emit("join-room", roomId, id);
             });
 
-            peerInstance.on("call", (call: any) => {
-                if (streamRef.current) {
-                    call.answer(streamRef.current);
-                }
-                call.on("stream", (stream: MediaStream) => {
+            socket!.on("user-connected", (userId) => {
+                console.log("user ID: ", userId);
+                peer.current!.call(userId, streamRef.current!);
+                socket?.emit("responsePeerId", roomId, peerId.current);
+            });
+
+            socket?.on("old-user", (userId) => {
+                peer.current?.call(userId, streamRef.current!);
+            });
+
+            peer.current.on("call", (call) => {
+                call.answer(streamRef.current!);
+                call.on("stream", (userStream) => {
                     if (remoteVideo.current) {
-                        remoteVideo.current.srcObject = stream;
+                        remoteVideo.current.srcObject = userStream;
+                        console.log(
+                            "remote video",
+                            remoteVideo.current?.srcObject,
+                        );
                     }
                 });
             });
-
-            socket?.on("user-connect", (userId: string) => {
-                if (streamRef.current) {
-                    const call2 = peerInstance.call(userId, streamRef.current);
-                    call2.on("stream", (remoteStream: MediaStream) => {
-                        if (remoteVideo.current) {
-                            remoteVideo.current.srcObject = remoteStream;
-                        }
-                    });
-                }
-            });
-        })();
-
+        } catch (error) {
+            console.log(error);
+        }
         return () => {
-            peerInstance?.destroy();
+            socket?.off("client-connect");
+            socket?.off("serverResponse");
             socket?.off("user-connect");
         };
-    }, []);
+    }, [socket]);
 
     const closeCamera = () => {
         streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -121,13 +139,17 @@ export default function Page() {
                     playsInline
                     muted
                     className={clsx(
-                        "bg-Border-vid mx-auto h-full -scale-x-100 transform object-cover transition-all duration-300",
-                        !true && "bg-Border-vid h-full w-full rounded-2xl",
+                        "bg-Border-vid mx-auto h-full w-full -scale-x-100 transform object-cover transition-all duration-300",
+                        !isCameraOn &&
+                            "bg-Border-vid h-full w-full rounded-2xl",
                     )}
                 />
                 <video
                     ref={remoteVideo}
-                    className="bg-Border-vid h-full w-full"
+                    autoPlay
+                    playsInline
+                    muted
+                    className="bg-Border-vid h-full w-full object-cover"
                 />
             </div>
             <div className="relative flex w-full items-center py-4">
